@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="http://192.168.1.146:8091/Build/Cesium/Cesium.js"></script>
+    <link href="http://192.168.1.146:8091/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <script src="https://cdn.staticfile.org/vue/2.2.2/vue.min.js"></script>
+    <script src="./datgui.js"></script>
+    <script src="./datgui.js"></script>
+    <title>COME ON</title>
+</head>
+<style>
+    /* *{
+        width: 100%;
+        height: 100%;
+
+    } */
+    body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    #box {
+        width: 100%;
+        height: 100vh;
+        /* background-color: red; */
+    }
+
+    .dataChoose {
+        width: 300px;
+        height: 500px;
+        background: rgba(255, 255, 255, 0.5);
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 999;
+    }
+
+    .dataChoose ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-size: 21px;
+        text-align: center;
+    }
+</style>
+
+<body>
+    <div id="box">
+
+        <div class="dataChoose">
+            <ul>
+                <li>
+                    <span>GLBURL</span>
+                    <input type="text" v-model='GLBUrl'>
+                    <span>3dtileURL</span>
+                    <input type="text" v-model='TileUrl'>
+                    <span>UrlProvider</span>
+                    <input type="text" v-model='urlProvider'>
+                    <span>ArcGisProvider</span>
+                    <input type="text" v-model='ArcGisProvider'>
+                    <span>WMSIProvider</span>
+                    <input type="text" v-model='WMSIProvider'>
+                    <span>WMTSIProvider</span>
+                    <input type="text" v-model='WMTSIProvider'>
+                    <span>lng</span>
+                    <input type="number" v-model='lng' size="15" step="0.000001">
+                    <span>lat</span>
+                    <input type="number" v-model='lat' size="15" step="0.000001">
+                </li>
+            </ul>
+        </div>
+
+    </div>
+    <script>
+        let viewer = null;
+    </script>
+    <script>
+        var app = new Vue({
+            el: '#box',
+            data: {
+                entityGLB: null,
+                entityTile: null,
+                lng: 118.1237785572599,
+                lat: 38.2931403589422,
+                GLBUrl: 'http://106.15.228.37:8016/mapAndModel/model/bzg_sb1214.glb',
+                TileUrl: 'http://localhost:8999/resource/model/buildings/build5/tileset.json',
+                urlProvider: 'urlProvider(zxy)',
+                ArcGisProvider: 'ArcGisProvider',
+                WMSIProvider: 'WMSIProvider(geoserver)',
+                WMTSIProvider: 'WMTSIProvider(tianditu)',
+                options: {
+                    height: 0,
+                    heading: 0,
+                    pitch: 0,
+                    roll: 0,
+                    scale: 1.0
+                    // add:function(){
+                    //     this.height+=0.000001
+                    // }
+                }
+            },
+            computed: {
+                height() { return this.options.height },
+                heading() { return this.options.heading },
+                pitch() { return this.options.pitch },
+                roll() { return this.options.roll },
+                scale() { return this.options.scale },
+            },
+            methods: {
+                initDatGui() {
+                    var gui = new dat.GUI();
+                    gui.add(this.options, 'height', -10, 100).step(1)
+                    gui.add(this.options, 'heading', 0, 360)
+                    gui.add(this.options, 'pitch', -90, 90)
+                    gui.add(this.options, 'roll', 0, 360)
+                    gui.add(this.options, 'scale', 0, 10)
+
+                },
+
+                initMap() {
+                    viewer = new Cesium.Viewer('box', {
+                        animation: false, //是否显示动画控件
+                        shouldAnimate: true,
+                        homeButton: false, //是否显示Home按钮
+                        fullscreenButton: false, //是否显示全屏按钮
+                        baseLayerPicker: false, //是否显示图层选择控件
+                        geocoder: false, //是否显示地名查找控件
+                        timeline: false, //是否显示时间线控件
+                        sceneModePicker: false, //是否显示投影方式控件
+                        navigationHelpButton: false, //是否显示帮助信息控件
+                        infoBox: false, //是否显示点击要素之后显示的信息
+                        requestRenderMode: false, //启用请求渲染模式
+                        scene3DOnly: true, //每个几何实例将只能以3D渲染以节省GPU内存
+                        sceneMode: 3, //初始场景模式 1 2.5D模式 2 2D循环模式 3 3D模式  
+                        selectionIndicator: false,
+                        // imageryProvider: this.imageryProvider,
+                    });
+                    // viewer.scene.imageryLayers.removeAll();
+                },
+
+                hprTransform(ent, heading, pitch, roll) {
+
+                    const position = Cesium.Cartesian3.fromDegrees(
+                        this.lng, this.lat,
+                        this.options.height
+                    );
+                    const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(heading || this.options.heading), Cesium.Math.toRadians(pitch || this.options.pitch), Cesium.Math.toRadians(roll || this.options.roll));
+                    const orientation = Cesium.Transforms.headingPitchRollQuaternion(
+                        position,
+                        hpr
+                    );
+                    ent.orientation = orientation
+                },
+
+                TileTransform(heading, pitch, roll, lng, lat, height, scale) {
+
+                    var mx = Cesium.Matrix3.fromRotationX(
+                        Cesium.Math.toRadians(heading)
+                    );
+                    var my = Cesium.Matrix3.fromRotationY(
+                        Cesium.Math.toRadians(pitch)
+                    );
+                    var mz = Cesium.Matrix3.fromRotationZ(
+                        Cesium.Math.toRadians(roll)
+                    );
+                    var rotationX = Cesium.Matrix4.fromRotationTranslation(mx);
+                    var rotationY = Cesium.Matrix4.fromRotationTranslation(my);
+                    var rotationZ = Cesium.Matrix4.fromRotationTranslation(mz);
+                    //平移 修改经纬度
+                    var position = Cesium.Cartesian3.fromDegrees(lng, lat, height);
+                    var m = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+                    //旋转、平移矩阵相乘
+                    Cesium.Matrix4.multiply(m, rotationX, m);
+                    Cesium.Matrix4.multiply(m, rotationY, m);
+                    Cesium.Matrix4.multiply(m, rotationZ, m);
+                    //缩放 修改缩放比例
+                    var pscale = Cesium.Matrix4.fromUniformScale(scale);
+                    Cesium.Matrix4.multiply(m, pscale, m);
+                    //赋值给tileset
+                    this.entityGLB._root.transform = m;
+                }
+            },
+            watch: {
+                GLBUrl(newV, oldV) {
+                    const position = Cesium.Cartesian3.fromDegrees(
+                        this.lng, this.lat,
+                        this.options.height
+                    );
+                    const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(this.options.heading), Cesium.Math.toRadians(this.options.pitch), Cesium.Math.toRadians(this.options.roll));
+                    const orientation = Cesium.Transforms.headingPitchRollQuaternion(
+                        position,
+                        hpr
+                    );
+                    this.entityGLB = viewer.entities.add({
+                        name: newV,
+                        type: 'glb',
+                        position: position,
+                        orientation: orientation,
+                        model: {
+                            uri: newV,
+                            scale: this.options.scale
+                        },
+                    });
+                    viewer.zoomTo(this.entityGLB);
+                    console.log(this.entityGLB);
+                },
+                TileUrl(newV) {
+
+                    this.entityGLB = new Cesium.Cesium3DTileset({
+                        url: newV,
+                        maximumScreenSpaceError: 1,
+                        preferLeaves: true
+                    })
+                    var that = this
+                    this.entityGLB.readyPromise
+                        .then(function () {
+                            let { heading, pitch, roll, height, scale } = that.options;
+                            that.TileTransform(heading, pitch, roll, that.lng, that.lat, height, scale);
+                            viewer.scene.primitives.add(that.entityGLB);
+                            viewer.zoomTo(that.entityGLB)
+                        })
+                    console.log(this.entityGLB);
+
+                },
+
+                urlProvider(newV, oldV) {
+                    viewer.scene.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+                        url: newV,
+                    }))
+                },
+                ArcGisProvider(newV, oldV) {
+                    viewer.scene.imageryLayers.addImageryProvider(new Cesium.ArcGisMapServerImageryProvider({
+                        url: newV,
+                    }))
+                },
+                WMSIProvider(newV, oldV) {
+                    viewer.scene.imageryLayers.addImageryProvider(new Cesium.WebMapServiceImageryProvider({
+                        url: newV,
+                    }))
+                },
+                WMTSIProvider(newV, oldV) {
+                    viewer.scene.imageryLayers.addImageryProvider(new Cesium.WebMapTileServiceImageryProvider({
+                        url: newV,
+                    }))
+                },
+                lng(newV) {
+                    let { heading, pitch, roll, height, scale } = this.options;
+                    this.entityGLB.type ? this.entityGLB.position = Cesium.Cartesian3.fromDegrees(
+                        newV, this.lat,
+                        height
+                    ) : this.TileTransform(heading, pitch, roll, newV, this.lat, height, scale)
+
+
+                },
+                lat(newV) {
+                    let { heading, pitch, roll, height, scale } = this.options;
+                    this.entityGLB.type ? this.entityGLB.position = Cesium.Cartesian3.fromDegrees(
+                        this.lng, newV,
+                        height
+                    ) : this.TileTransform(heading, pitch, roll, this.lng, newV, height, scale)
+
+                },
+                height(newV) {
+                    let { heading, pitch, roll, scale } = this.options;
+                    this.entityGLB.type ? this.entityGLB.position = Cesium.Cartesian3.fromDegrees(
+                        this.lng, this.lat,
+                        newV
+                    ) : this.TileTransform(heading, pitch, roll, this.lng, this.lat, newV, scale)
+                },
+                heading(newV) {
+                    let { heading, pitch, roll, height, scale } = this.options;
+                    this.entityGLB.type ? this.hprTransform(this.entityGLB, newV) : this.TileTransform(newV, pitch, roll, this.lng, this.lat, height, scale)
+                },
+                pitch(newV) {
+                    let { heading, pitch, roll, height, scale } = this.options;
+                    this.entityGLB.type ? this.hprTransform(this.entityGLB, null, newV) : this.TileTransform(heading, newV, roll, this.lng, this.lat, height, scale)
+
+                },
+                roll(newV) {
+                    let { heading, pitch, roll, height, scale } = this.options;
+                    this.entityGLB.type ? this.hprTransform(this.entityGLB, null, null, newV) : this.TileTransform(heading, pitch, newV, this.lng, this.lat, height, scale)
+
+
+                },
+                scale(newV) {
+                    let { heading, pitch, roll, height, scale } = this.options;
+                    this.entityGLB.type ? this.entityGLB.model.scale = newV : this.TileTransform(heading, pitch, roll, this.lng, this.lat, height, newV)
+
+
+                }
+            },
+            mounted() {
+                this.initDatGui();
+                this.initMap();
+            }
+        });
+    </script>
+
+
+    <!-- <script>
+        var Options = function () {
+        };
+
+        window.onload = function () {
+            var options = new Options();
+        };
+
+        let obj = new Options()
+        document.getElementById('box').innerText = obj.message;
+
+    </script> -->
+</body>
+
+</html>
